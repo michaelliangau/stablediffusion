@@ -5,7 +5,9 @@ import numpy as np
 from tqdm import tqdm
 
 from ldm.modules.diffusionmodules.util import make_ddim_sampling_parameters, make_ddim_timesteps, noise_like, extract_into_tensor
-
+from einops import rearrange
+from PIL import Image
+import os
 
 class DDIMSampler(object):
     def __init__(self, model, schedule="linear", device=torch.device("cuda"), **kwargs):
@@ -76,6 +78,7 @@ class DDIMSampler(object):
                unconditional_conditioning=None, # this has to come in the same format as the conditioning, # e.g. as encoded tokens, ...
                dynamic_threshold=None,
                ucg_schedule=None,
+               model=None,
                **kwargs
                ):
         if conditioning is not None:
@@ -116,7 +119,8 @@ class DDIMSampler(object):
                                                     unconditional_guidance_scale=unconditional_guidance_scale,
                                                     unconditional_conditioning=unconditional_conditioning,
                                                     dynamic_threshold=dynamic_threshold,
-                                                    ucg_schedule=ucg_schedule
+                                                    ucg_schedule=ucg_schedule,
+                                                    model=model,
                                                     )
         return samples, intermediates
 
@@ -127,7 +131,7 @@ class DDIMSampler(object):
                       mask=None, x0=None, img_callback=None, log_every_t=100,
                       temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
                       unconditional_guidance_scale=1., unconditional_conditioning=None, dynamic_threshold=None,
-                      ucg_schedule=None):
+                      ucg_schedule=None, model=None):
         device = self.model.betas.device
         b = shape[0]
         if x_T is None:
@@ -162,12 +166,12 @@ class DDIMSampler(object):
                 unconditional_guidance_scale = ucg_schedule[i]
 
             outs = self.p_sample_ddim(img, cond, ts, index=index, use_original_steps=ddim_use_original_steps,
-                                      quantize_denoised=quantize_denoised, temperature=temperature,
-                                      noise_dropout=noise_dropout, score_corrector=score_corrector,
-                                      corrector_kwargs=corrector_kwargs,
-                                      unconditional_guidance_scale=unconditional_guidance_scale,
-                                      unconditional_conditioning=unconditional_conditioning,
-                                      dynamic_threshold=dynamic_threshold)
+                                    quantize_denoised=quantize_denoised, temperature=temperature,
+                                    noise_dropout=noise_dropout, score_corrector=score_corrector,
+                                    corrector_kwargs=corrector_kwargs,
+                                    unconditional_guidance_scale=unconditional_guidance_scale,
+                                    unconditional_conditioning=unconditional_conditioning,
+                                    dynamic_threshold=dynamic_threshold)
             img, pred_x0 = outs
             if callback: callback(i)
             if img_callback: img_callback(pred_x0, i)
@@ -175,6 +179,17 @@ class DDIMSampler(object):
             if index % log_every_t == 0 or index == total_steps - 1:
                 intermediates['x_inter'].append(img)
                 intermediates['pred_x0'].append(pred_x0)
+            
+            # Decode and save image
+            x_samples = model.decode_first_stage(img)
+            x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
+            for x_sample in x_samples:
+                x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
+                img_sav = Image.fromarray(x_sample.astype(np.uint8))
+                # img.save("/home/michael/tmp/stablediffusion/outputs/txt2img-samples/output.png")
+                img_sav.save(os.path.join("/home/michael/tmp/stablediffusion/outputs/txt2img-samples/samples", f"{index}.png"))                
+                print("saved")
+            # TODO: Trying to what is the correct schedule to enable infinite diffusion here, I suspect you can just use a very high number in the make_schedule function.
 
         return img, intermediates
 

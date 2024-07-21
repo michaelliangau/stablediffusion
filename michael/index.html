@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-refreshing Image</title>
+    <script>
+        function refreshImage() {
+            var img = document.getElementById("dynamicImage");
+            var timestamp = new Date().getTime();
+            img.src = "/path/to/your/image.jpg?t=" + timestamp;
+        }
+
+        // Refresh the image
+        setInterval(refreshImage, 100);
+    </script>
+</head>
+<body onload="refreshImage()">
+    <img id="dynamicImage" alt="Dynamic Image" />
+</body>
+</html>

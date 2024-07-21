@@ -1,3 +1,7 @@
+"""
+python scripts/txt2img.py --prompt "a professional photograph of an astronaut riding a horse" --ckpt /home/michael/tmp/stable_diffusion_ckpt/v2-1_768-ema-pruned.ckpt --config configs/stable-diffusion/v2-inference-v.yaml --H 768 --W 768  --device=cuda --bf16 --n_samples 1 --n_rows 0 --n_iter 1
+"""
+
 import argparse, os
 import cv2
 import torch
@@ -352,8 +356,10 @@ def main(opt):
                                                      unconditional_guidance_scale=opt.scale,
                                                      unconditional_conditioning=uc,
                                                      eta=opt.ddim_eta,
-                                                     x_T=start_code)
-
+                                                     x_T=start_code,
+                                                     model=model
+                                                     )
+                    exit()
                     x_samples = model.decode_first_stage(samples)
                     x_samples = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
 
